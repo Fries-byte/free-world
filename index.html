@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Webhook Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #chat-box { width: 80%; max-width: 500px; height: 400px; border: 1px solid #ccc; overflow-y: auto; margin: 20px auto; padding: 10px; background: #f9f9f9; }
+        #message { width: 70%; }
+        .message { border-bottom: 1px solid #ddd; padding: 5px; text-align: left; }
+        .image { max-width: 100%; height: auto; display: block; margin-top: 5px; }
+        .user-message { color: blue; font-weight: bold; }
+        input, button { margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Discord Webhook Chat</h1>
+    <div id="chat-box"></div>
+    <input type="text" id="message" placeholder="Type a message...">
+    <button onclick="sendMessage()">Send</button>
+    <input type="file" id="imageInput" accept="image/*">
+    <button onclick="uploadImage()">Upload Image</button>
+
+    <script>
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1319259063678271548/hDiin0VISOlQian1VnL43QfqI1dbx8Z-NtpRVqCLpIOROOQ_-_8xAjrf2Pg2t5LHN0Yb"; // Your webhook URL
+        const PROXY_URL = "https://your-github-username.github.io/your-repo/api/messages"; // Proxy server URL
+
+        const chatBox = document.getElementById("chat-box");
+        const messageInput = document.getElementById("message");
+        const imageInput = document.getElementById("imageInput");
+
+        // Send a text message
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+            sendToDiscord({ content: message });
+            displayMessage("You: " + message, null, true); // Display the message immediately
+            messageInput.value = "";
+        }
+
+        // Upload an image
+        function uploadImage() {
+            const file = imageInput.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                sendToDiscord({ content: "📷 Image uploaded:", file: file });
+                displayMessage("You: 📷 Image uploaded", e.target.result, true); // Display the image immediately
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Send data to Discord webhook
+        function sendToDiscord(data) {
+            const formData = new FormData();
+            formData.append("content", data.content);
+            if (data.file) {
+                formData.append("file", data.file);
+            }
+
+            fetch(DISCORD_WEBHOOK_URL, {
+                method: "POST",
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    fetchMessages(); // Refresh messages after sending
+                } else {
+                    console.error("Webhook Error:", response.statusText);
+                }
+            })
+            .catch(err => console.error("Webhook Error:", err));
+        }
+
+        // Fetch messages from Discord channel via proxy
+        function fetchMessages() {
+            fetch(PROXY_URL)
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error("Failed to fetch messages");
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    chatBox.innerHTML = ""; // Clear the chat box
+                    data.reverse().forEach(msg => {
+                        const username = msg.author?.username || "Unknown";
+                        const content = msg.content;
+                        const imageUrl = msg.attachments?.length > 0 ? msg.attachments[0].url : null;
+                        displayMessage(`${username}: ${content}`, imageUrl, username === "Fries"); // Display messages from others
+                    });
+                })
+                .catch(err => console.error("Fetch Error:", err));
+        }
+
+        // Display a message in the chat box
+        function displayMessage(content, imageUrl, isUserMessage) {
+            const messageDiv = document.createElement("div");
+            messageDiv.classList.add("message");
+            if (isUserMessage) {
+                messageDiv.classList.add("user-message");
+            }
+
+            // Add text content
+            if (content) {
+                const textNode = document.createTextNode(content);
+                messageDiv.appendChild(textNode);
+            }
+
+            // Add image if available
+            if (imageUrl) {
+                const img = document.createElement("img");
+                img.src = imageUrl;
+                img.classList.add("image");
+                messageDiv.appendChild(img);
+            }
+
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll to the bottom
+        }
+
+        // Fetch messages every 3 seconds
+        setInterval(fetchMessages, 3000);
+        fetchMessages(); // Initial fetch on page load
+    </script>
+</body>
+</html>
